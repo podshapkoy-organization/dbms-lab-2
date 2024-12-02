@@ -93,14 +93,92 @@ initdb -D $HOME/lnx18
 ```bash
 rm -rf $HOME/lnx18/*
 ```
+### Запуск сервера
+```bash
+pg_ctl -D $HOME/lnx18 start
+```
 
 ## Этап 2. Конфигурация и запуск сервера БД
+### - Способы подключения: 1) Unix-domain сокет в режиме peer; 2) сокет TCP/IP, принимать подключения к любому IP-адресу узла
+### - Номер порта: 9495
+### Способ аутентификации TCP/IP клиентов: по паролю SHA-256
+### Остальные способы подключений запретить.
+#### Настройка pg_hba.conf
+```bash
+vi $HOME/lnx18/pg_hba.conf
+```
+```vim
+# TYPE  DATABASE        USER            ADDRESS                 METHOD
+
+# Unix-domain сокеты (peer-аутентификация)
+local   all             all                                     peer
+
+# TCP/IP соединения (SHA-256 аутентификация)
+host    all             all             0.0.0.0/0               scram-sha-256
+host    all             all             ::/0                    scram-sha-256
+
+# Отключение всех остальных подключений
+# IPv4
+host    all             all             127.0.0.1/32            reject
+# IPv6
+host    all             all             ::1/128                 reject
+```
+#### Настройка postgresql.conf
+```bash
+vi $HOME/lnx18/postgresql.conf
+```
+```vim
+# Разрешение подключения через TCP/IP
+listen_addresses = '*'          # Принимать подключения с любого IP-адреса
+port = 9495
+
+# Аутентификация по паролю с использованием SCRAM-SHA-256
+password_encryption = scram-sha-256   # Включаем SCRAM-SHA-256 для паролей
+
+# Рекомендуемые параметры для безопасности
+ssl = off                       # (если SSL не используется)
+```
 
 
+[//]: # ()
+[//]: # (```bash)
 
+[//]: # (psql -p 9555 -d postgres)
 
+[//]: # (```)
 
+[//]: # ()
+[//]: # (### Создайте базу на основе template0:)
 
+[//]: # (```bash)
+
+[//]: # (createdb -T template0 tallgreenidea)
+
+[//]: # (```)
+
+[//]: # (### Создайте новую роль:)
+
+[//]: # (```bash)
+
+[//]: # (create role test_user with login password 'test_user';)
+
+[//]: # (```)
+
+[//]: # (### Предоставьте права новой роли:)
+
+[//]: # (```postgresql)
+
+[//]: # (grant all privileges on database tallgreenidea to test_user;)
+
+[//]: # (```)
+
+[//]: # (### )
+
+[//]: # (```postgresql)
+
+[//]: # (psql -p 9495 -h pg178 -d tallgreenidea -U test_user)
+
+[//]: # (```)
 
 
 
