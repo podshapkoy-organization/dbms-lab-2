@@ -93,16 +93,18 @@ initdb -D $HOME/lnx18
 ```bash
 rm -rf $HOME/lnx18/*
 ```
-### Запуск сервера
+### Запуск, перезапуск, статус сервера
 ```bash
 pg_ctl -D $HOME/lnx18 start
+pg_ctl -D $HOME/lnx18 restart
+pg_ctl -D $HOME/lnx18 status
 ```
 
 ## Этап 2. Конфигурация и запуск сервера БД
 ### - Способы подключения: 1) Unix-domain сокет в режиме peer; 2) сокет TCP/IP, принимать подключения к любому IP-адресу узла
 ### - Номер порта: 9495
-### Способ аутентификации TCP/IP клиентов: по паролю SHA-256
-### Остальные способы подключений запретить.
+### - Способ аутентификации TCP/IP клиентов: по паролю SHA-256
+### - Остальные способы подключений запретить.
 #### Настройка pg_hba.conf
 ```bash
 vi $HOME/lnx18/pg_hba.conf
@@ -138,47 +140,104 @@ password_encryption = scram-sha-256   # Включаем SCRAM-SHA-256 для п
 # Рекомендуемые параметры для безопасности
 ssl = off                       # (если SSL не используется)
 ```
+```
+SELECT * FROM pg_roles;
+\du    -- Отображение всех ролей
+\db+   -- Отображение всех табличных пространств и их содержимого
+```
+### - Настроить следующие параметры сервера БД:
+#### max_connections
+```postgresql
+max_connections = 10
+```
 
+#### shared_buffers
+```postgresql
+shared_buffers = 1GB
+```
+#### temp_buffers (на пользователя): всего 10 * 16MB = 160MB
+```postgresql
+temp_buffers = 16MB
+```
+#### work_mem (на пользователя): всего 10 * 4MB = 40MB
+```postgresql
+work_mem = 4MB
+```
+#### checkpoint_timeout
+```postgresql
+checkpoint_timeout = 15min
+```
+#### effective_cache_size
+```postgresql
+effective_cache_size = 3GB
+```
+#### fsync
+```postgresql
+fsync = on
+```
+#### commit_delay
+```postgresql
+commit_delay = 0
+``` 
+Параметры должны быть подобраны в соответствии со сценарием OLAP: 10 одновременных пользователей, пакетная запись/чтение данных по 128МБ.
+### - Директория WAL файлов: $PGDATA/pg_wal
+```postgresql
+log_directory = '$PGDATA/pg_wal'
+```
+### - Формат лог-файлов: .log
+```postgresql
+log_filename = 'postgresql-%Y-%m-%d_%H%M%S.log'
+```
+### - Уровень сообщений лога: ERROR (чтобы логировать только ошибки)
+```postgresql
+log_min_messages = ERROR
+```
+### - Дополнительно логировать: завершение сессий и продолжительность выполнения команд
+```postgresql
+log_duration = on
+log_statement_stats = on
+log_connections = on
+log_disconnections = on
+```
+## Этап 3. Дополнительные табличные пространства и наполнение базы
 
-[//]: # ()
-[//]: # (```bash)
+### - Создать новые табличные пространства для различных таблиц: $HOME/buy76, $HOME/mxa55, $HOME/zsx86
+```postgresql
+mkdir -p $HOME/buy76 $HOME/mxa55 $HOME/zsx86 --- директории для табличных пространств
+```
+```postgresql
+chmod 700 $HOME/buy76 $HOME/mxa55 $HOME/zsx86 --- права доступа на каталоги
+```
+```postgresql
+CREATE TABLESPACE buy76 LOCATION '/var/db/postgres1/buy76';
+CREATE TABLESPACE mxa55 LOCATION '/var/db/postgres1/mxa55';
+CREATE TABLESPACE zsx86 LOCATION '/var/db/postgres1/zsx86';
+```
+### - На основе template0 создать новую базу: tallgreenidea
+```postgresql
+createdb -T template0 tallgreenidea -p 9495
+```
 
-[//]: # (psql -p 9555 -d postgres)
+### - Создать новую роль, предоставить необходимые права, разрешить подключение к базе.
+```postgresql
+create role test_user with login password 'test_user';
 
-[//]: # (```)
+grant all privileges on database tallgreenidea to test_user;
 
-[//]: # ()
-[//]: # (### Создайте базу на основе template0:)
+```
+### - От имени новой роли (не администратора) произвести наполнение ВСЕХ созданных баз тестовыми наборами данных. ВСЕ табличные пространства должны использоваться по назначению.
 
-[//]: # (```bash)
+### - Вывести список всех табличных пространств кластера и содержащиеся в них объекты.
 
-[//]: # (createdb -T template0 tallgreenidea)
+```bash
+psql -p 9495 -d postgres
+```
 
-[//]: # (```)
+### Подключитесь к базе данных:
 
-[//]: # (### Создайте новую роль:)
-
-[//]: # (```bash)
-
-[//]: # (create role test_user with login password 'test_user';)
-
-[//]: # (```)
-
-[//]: # (### Предоставьте права новой роли:)
-
-[//]: # (```postgresql)
-
-[//]: # (grant all privileges on database tallgreenidea to test_user;)
-
-[//]: # (```)
-
-[//]: # (### )
-
-[//]: # (```postgresql)
-
-[//]: # (psql -p 9495 -h pg178 -d tallgreenidea -U test_user)
-
-[//]: # (```)
+```postgresql
+psql -p 9495 -h pg178 -d tallgreenidea -U test_user
+```
 
 
 
